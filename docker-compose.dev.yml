@@ -1,0 +1,4 @@
+services:
+  mqnode-api:
+    ports:
+      - '8000:8000'

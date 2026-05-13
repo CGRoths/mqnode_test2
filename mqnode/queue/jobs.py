@@ -1,0 +1,6 @@
+BTC_RAW_QUEUE = 'btc_raw'
+BTC_PRIMITIVE_QUEUE = 'btc_primitive'
+BTC_NETWORK_QUEUE = 'btc_network'
+BTC_MINER_QUEUE = 'btc_miner'
+BTC_MARKET_QUEUE = 'btc_market'
+BTC_VALUATION_QUEUE = 'btc_valuation'

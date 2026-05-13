@@ -1,0 +1,11 @@
+fastapi
+httpx
+uvicorn
+psycopg2-binary
+redis
+rq
+requests
+pydantic
+pydantic-settings
+python-dotenv
+pytest
