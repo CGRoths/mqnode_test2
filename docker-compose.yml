@@ -100,6 +100,28 @@ services:
       postgres:
         condition: service_healthy
 
+  price-source-worker-bybit:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    command: ["python", "-m", "mqnode.market.price.source_worker", "--source", "bybit"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  price-source-worker-okx:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    command: ["python", "-m", "mqnode.market.price.source_worker", "--source", "okx"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   mqnode-api:
     build: .
     restart: unless-stopped
@@ -123,4 +145,3 @@ services:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
     depends_on:
       - mqnode-api
-

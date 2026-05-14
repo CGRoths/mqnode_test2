@@ -70,6 +70,11 @@ class Settings(BaseSettings):
         'bybit,okx,binance,coinbase,kraken,bitstamp',
         alias='PRICE_SOURCE_LIFECYCLE_SOURCES',
     )
+    price_source_worker_poll_seconds: int = Field(60, alias='PRICE_SOURCE_WORKER_POLL_SECONDS')
+    price_source_worker_confirmation_poll_seconds: int = Field(
+        1,
+        alias='PRICE_SOURCE_WORKER_CONFIRMATION_POLL_SECONDS',
+    )
     internal_ingest_token: str | None = Field(None, alias='MQNODE_INTERNAL_INGEST_TOKEN')
 
     @property

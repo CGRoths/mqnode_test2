@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import asyncio
 import inspect
 import logging
@@ -9,6 +10,7 @@ from datetime import datetime, timedelta
 from importlib import import_module
 from typing import Any, Callable
 
+from mqnode.config.logging_config import configure_logging
 from mqnode.config.settings import get_settings
 from mqnode.core.utils import to_bucket_start_10m, utc_now
 from mqnode.db.connection import DB
@@ -478,3 +480,31 @@ class SourcePriceWorker:
             compose_fn=self.compose_fn,
             now=self.now_fn(),
         )
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--source', required=True)
+    parser.add_argument('--symbol', default=None)
+    parser.add_argument('--poll-seconds', type=int, default=None)
+    parser.add_argument('--confirmation-poll-seconds', type=int, default=None)
+    parser.add_argument('--max-cycles', type=int, default=None)
+    args = parser.parse_args(argv)
+
+    settings = get_settings()
+    configure_logging(settings.log_level)
+
+    worker = SourcePriceWorker(
+        source_name=args.source,
+        symbol=args.symbol,
+        settings=settings,
+    )
+    worker.run_forever(
+        poll_seconds=args.poll_seconds,
+        confirmation_poll_seconds=args.confirmation_poll_seconds,
+        max_cycles=args.max_cycles,
+    )
+
+
+if __name__ == '__main__':
+    main()
