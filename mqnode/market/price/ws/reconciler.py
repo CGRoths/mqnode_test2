@@ -7,6 +7,14 @@ from math import inf
 from mqnode.market.price.ws.models import REST_CONFIRMED, ensure_utc
 from mqnode.market.price.ws.repository import PriceWsRepository
 
+REQUIRED_REST_ROW_FIELDS = (
+    'open_price_usd',
+    'high_price_usd',
+    'low_price_usd',
+    'close_price_usd',
+    'volume_btc',
+)
+
 
 @dataclass(frozen=True)
 class ReconciliationResult:
@@ -27,6 +35,16 @@ def _bps_delta(old_value, new_value) -> float:
     if new_value == 0:
         return 0.0 if old_value == 0 else inf
     return abs(old_value - new_value) / abs(new_value) * 10_000
+
+
+def _current_quality_status(ws_row: dict) -> str:
+    return str(ws_row.get('quality_status') or '')
+
+
+def _rest_row_is_complete(rest_row: dict) -> bool:
+    if rest_row.get('bucket_start_utc') is None:
+        return False
+    return all(rest_row.get(field) is not None for field in REQUIRED_REST_ROW_FIELDS)
 
 
 class PriceWsReconciler:
@@ -59,6 +77,25 @@ class PriceWsReconciler:
     ) -> ReconciliationResult:
         bucket_start_utc = ensure_utc(ws_row['bucket_start_utc'])
         now = ensure_utc(now)
+        if not _rest_row_is_complete(rest_row):
+            return ReconciliationResult(
+                source_name,
+                bucket_start_utc,
+                _current_quality_status(ws_row),
+                revised=False,
+                reason='rest_row_incomplete',
+            )
+
+        rest_bucket_start_utc = ensure_utc(rest_row['bucket_start_utc'])
+        if rest_bucket_start_utc != bucket_start_utc:
+            return ReconciliationResult(
+                source_name,
+                bucket_start_utc,
+                _current_quality_status(ws_row),
+                revised=False,
+                reason='rest_bucket_mismatch',
+            )
+
         if self.is_within_tolerance(ws_row, rest_row):
             self.repository.mark_rest_confirmed(db, table_name, bucket_start_utc, now)
             return ReconciliationResult(source_name, bucket_start_utc, REST_CONFIRMED, revised=False)
@@ -78,4 +115,3 @@ class PriceWsReconciler:
             revision_reason=reason,
         )
         return ReconciliationResult(source_name, bucket_start_utc, REST_CONFIRMED, revised=True, reason=reason)
-

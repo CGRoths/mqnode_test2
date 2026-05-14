@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
-from mqnode.market.price.ws.models import REST_CONFIRMED
+from mqnode.market.price.ws.models import REST_CONFIRMED, WS_CLOSED
 from mqnode.market.price.ws.reconciler import PriceWsReconciler
 
 
@@ -30,6 +30,7 @@ def _row(bucket, close=100, volume_btc=5):
         'volume_btc': volume_btc,
         'volume_usd': 500,
         'raw_payload': {'row': close},
+        'quality_status': WS_CLOSED,
     }
 
 
@@ -80,3 +81,49 @@ def test_rest_diff_beyond_tolerance_updates_row_and_records_revision_log():
     assert revision['revision_reason'] == 'rest_confirmation_mismatch'
     assert revision['old_row']['close_price_usd'] == 100
     assert revision['new_row']['close_price_usd'] == 101
+
+
+def test_incomplete_rest_row_does_not_confirm_or_revise():
+    bucket = datetime(2026, 4, 20, 0, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 4, 20, 0, 10, 30, tzinfo=timezone.utc)
+    repository = _Repository()
+    reconciler = PriceWsReconciler(price_tolerance_bps=1, volume_tolerance_bps=10, repository=repository)
+    rest_row = {**_row(bucket, close=101), 'volume_btc': None}
+
+    result = reconciler.reconcile(
+        object(),
+        source_name='bybit',
+        table_name='bybit_price_10m',
+        ws_row={**_row(bucket, close=100), 'revision_count': 0},
+        rest_row=rest_row,
+        now=now,
+    )
+
+    assert result.quality_status == WS_CLOSED
+    assert result.revised is False
+    assert result.reason == 'rest_row_incomplete'
+    assert repository.confirmed == []
+    assert repository.revisions == []
+
+
+def test_rest_bucket_mismatch_does_not_confirm_or_revise():
+    bucket = datetime(2026, 4, 20, 0, 0, tzinfo=timezone.utc)
+    rest_bucket = datetime(2026, 4, 20, 8, 10, tzinfo=timezone(timedelta(hours=8)))
+    now = datetime(2026, 4, 20, 0, 10, 30, tzinfo=timezone.utc)
+    repository = _Repository()
+    reconciler = PriceWsReconciler(price_tolerance_bps=1, volume_tolerance_bps=10, repository=repository)
+
+    result = reconciler.reconcile(
+        object(),
+        source_name='bybit',
+        table_name='bybit_price_10m',
+        ws_row={**_row(bucket, close=100), 'revision_count': 0},
+        rest_row=_row(rest_bucket, close=101),
+        now=now,
+    )
+
+    assert result.quality_status == WS_CLOSED
+    assert result.revised is False
+    assert result.reason == 'rest_bucket_mismatch'
+    assert repository.confirmed == []
+    assert repository.revisions == []
